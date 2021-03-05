@@ -7,3 +7,5 @@ depends: [Vault]
 commands:
     triviastart:
         usage: /triviastart
+    triviarestart:
+        usage: /triviarestart
