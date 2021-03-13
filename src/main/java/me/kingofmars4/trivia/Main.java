@@ -5,8 +5,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.Random;
+import java.util.ArrayList;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,20 +15,20 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-
+import me.kingofmars4.points.utils.CurrencyManager;
+import me.kingofmars4.points.utils.PointsAPI;
 import net.milkbowl.vault.economy.Economy;
-import net.milkbowl.vault.economy.EconomyResponse;
 
 public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	
-	public static String answer = null;
+	public Question question = null;
 	private static Economy econ = null;
 	
-	HashMap<String, String> questions = new HashMap<String, String>();
+	ArrayList<Question> questions = new ArrayList<Question>();
 	
 	@Override
 	public void onEnable() {
-		loadConfigs();
+		loadConfig();
 		databaseSetup();
 		getQuestions();
 		setupEconomy();
@@ -43,26 +42,25 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	    }, 0L, 20*60L*60L);
 	}
 	
-	public void loadConfigs() {
+	public void loadConfig() {
 		getConfig().options().copyDefaults(true);
 		saveConfig();
 		
-		getLogger().info("Configuration files succefully loaded.");
+		getLogger().info("Configuration file succefully loaded.");
 	}
 	
 	@EventHandler
 	public void onChat(AsyncPlayerChatEvent e) {
-		if (answer != null) {
-			if (e.getMessage().equalsIgnoreCase(answer)) {
-				Bukkit.broadcastMessage(pluginPrefix+color("&e%p &5has succefully answered the question and won &a5000$&5!".replace("%p", e.getPlayer().getName())));
-				Bukkit.broadcastMessage(pluginPrefix+color("&5The answer was: &e&n"+answer));
-				
-				EconomyResponse r = econ.depositPlayer(e.getPlayer(), 5000);
-	            if(r.transactionSuccess()) {
-	                e.getPlayer().sendMessage(pluginPrefix+color("&5You were given &a%s and now have &a%d".replace("%s", econ.format(r.amount)).replace("%d", econ.format(r.balance))));
-	            }
+		if (question != null) {
+			String name = e.getPlayer().getName();
+			if (e.getMessage().equalsIgnoreCase(question.getAnswer())) {
+				Bukkit.broadcastMessage(pluginPrefix+color("&e%p &5has succefully answered the question and won &a%m points&5!".replace("%p", e.getPlayer().getName()).replace("%n", ""+question.getReward())));
+				Bukkit.broadcastMessage(pluginPrefix+color("&5The answer was: &e&n"+question.getAnswer()));
+				CurrencyManager cm = PointsAPI.getCurrencyManager();
+				cm.addPlayerMoney(name, question.getReward());
+	            e.getPlayer().sendMessage(pluginPrefix+color("&5You were given &e%s points&5 and now have &e%d".replace("%s", ""+question.getReward()).replaceAll("%d", ""+cm.getPlayerMoney(name))));
 	            
-				answer = null;
+	            question = null;
 			}
 			
 		}
@@ -74,7 +72,13 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 			ResultSet result = statement.executeQuery("SELECT * FROM questions;");
 	        
 			if (result.next()) {
-				 questions.put(result.getString("question"), result.getString("answer"));
+				if (!result.getString("question").endsWith("?") || !Character.isUpperCase(result.getString("question").charAt(0))) {
+					getLogger().info("Question: "+result.getString(result.getString("question")));
+					System.out.println("Could not be loaded: Must end with a '?' and start with a capital letter!");
+					return;
+				}
+
+				 questions.add(new Question(result.getString("question"), result.getString("answer"), result.getDouble("reward")));
             }
 			
 		} catch (SQLException e) {
@@ -84,11 +88,12 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	}
 	
     public void sendQuestion() {
-        Object pickedQuest = questions.keySet().toArray()[new Random().nextInt(questions.keySet().toArray().length)];
+        this.question = questions.get(random(0, questions.size()-1));
         
-        Bukkit.broadcastMessage(pluginPrefix+color("&5A new &fTRIVIA &5is now starting, answer the following question in order to win &a5000$&f!"));
-        Bukkit.broadcastMessage(color("&e&lQuestion: &5&n"+pickedQuest.toString()));
-        answer = questions.get(pickedQuest);
+        Bukkit.broadcastMessage(pluginPrefix+color("&5A new &fTRIVIA &5is now starting, answer the following question in order to win &e%n points&f!".replace("%n", question.getReward()+"")));
+        Bukkit.broadcastMessage(color("&e&lQuestion: &5&n"+question.getQuestion()));
+
+        getQuestions();
     }
 
 	
@@ -101,7 +106,6 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 			}
 		} else if (cmd.getName().equalsIgnoreCase("triviarestart")) {
 			if (sender.hasPermission("trivia.start")) {
-				loadConfigs();
 				questions.clear();
 				getQuestions();
 				sender.sendMessage(color("&aSuccefully reloaded trivia!"));
@@ -123,11 +127,13 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
     }
     
     public void databaseSetup() {
-    	host = "gajocraft.com";
-        port = "3306";
-        database = "trivia";
-        username = "trivia";
-        password = null;
+    	host = getConfig().getString("MySQL.host");
+        port = getConfig().getString("MySQL.port");
+        database = getConfig().getString("MySQL.database");
+        username = getConfig().getString("MySQL.username");
+        if (getConfig().getBoolean("MySQL.usingPassword")) {
+        	password = getConfig().getString("MySQL.password");
+        } else { password = null; }
         
 
 		try {    
@@ -144,6 +150,8 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 					"    id INT NOT NULL," + 
 					"    question VARCHAR(255) NOT NULL," + 
 					"    answer VARCHAR(255) NOT NULL," +
+					"    reward DOUBLE NOT NULL," +
+					"    difficulty INT NOT NULL DEFAULT 3," +
 					"    PRIMARY KEY (id)" + 
 					");");
 			
@@ -162,7 +170,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
         return (int) ((Math.random()*((max-min)+1))+min);
     }
     
-    public String pluginPrefix = color(getConfig().getString("Options.pluginPrefix"));
+    public String pluginPrefix = color(getConfig().getString("pluginPrefix"));
 	
 	
 	public static String color(String s) {

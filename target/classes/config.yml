@@ -1,10 +1,8 @@
-Options:
-    pluginPrefix: '&4[Trivia] '
-    
-Questions: 
-    Question1:
-        Quest: 'What is the result of 3+1?'
-        Answer: '4'
-    Question2:
-        Quest: 'What is the result of 3+1?'
-        Answer: '4'
+pluginPrefix: '&a[Trivia] '
+MySQL:
+    host: "localhost"
+    port: "3306"
+    database: "db"
+    username: "root"
+    usingPassword: false
+    password: "password"
