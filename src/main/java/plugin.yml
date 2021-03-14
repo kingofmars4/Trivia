@@ -3,7 +3,7 @@ author: KingOfMars4
 main: me.kingofmars4.trivia.Main
 version: 1.0
 description: Trivia minigame by KingOfMars4.
-depends: [Vault]
+depend: [PointsSystem]
 commands:
     triviastart:
         usage: /triviastart

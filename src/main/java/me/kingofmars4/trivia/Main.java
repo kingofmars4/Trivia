@@ -15,9 +15,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
-import me.kingofmars4.points.utils.CurrencyManager;
-import me.kingofmars4.points.utils.PointsAPI;
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
+
 
 public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	
@@ -53,13 +53,15 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	@EventHandler
 	public void onChat(AsyncPlayerChatEvent e) {
 		if (question != null) {
-			String name = e.getPlayer().getName();
 			if (e.getMessage().equalsIgnoreCase(question.getAnswer())) {
 				Bukkit.broadcastMessage(pluginPrefix+color("&e%p &5has succefully answered the question and won &a%m points&5!".replace("%p", e.getPlayer().getName()).replace("%n", ""+question.getReward())));
 				Bukkit.broadcastMessage(pluginPrefix+color("&5The answer was: &e&n"+question.getAnswer()));
-				CurrencyManager cm = PointsAPI.getCurrencyManager();
-				cm.addPlayerMoney(name, question.getReward());
-	            e.getPlayer().sendMessage(pluginPrefix+color("&5You were given &e%s points&5 and now have &e%d".replace("%s", ""+question.getReward()).replaceAll("%d", ""+cm.getPlayerMoney(name))));
+				
+				@SuppressWarnings("deprecation")
+				EconomyResponse r = econ.depositPlayer(e.getPlayer().getName(), question.getReward());
+				if (r.transactionSuccess()) {
+					e.getPlayer().sendMessage(pluginPrefix+color("&5You were given &e%s points&5 and now have &e%d".replace("%s", ""+question.getReward()).replaceAll("%d", ""+econ.getBalance(e.getPlayer()))));
+				}
 	            
 	            question = null;
 			}
@@ -89,7 +91,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	}
 	
     public void sendQuestion() {
-        questions.get(currentQuestion);
+        question = questions.get(currentQuestion);
         if (currentQuestion+1 > questions.size()-1) {
         	currentQuestion = 0;
         } else {
@@ -183,15 +185,15 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 		return s.replaceAll("&", "§");
 	}
 	
-	private boolean setupEconomy() {
-        if (getServer().getPluginManager().getPlugin("Vault") == null) {
-            return false;
-        }
-        RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) {
-            return false;
-        }
-        econ = rsp.getProvider();
-        return econ != null;
-    }
+	 private boolean setupEconomy() {
+	        if (getServer().getPluginManager().getPlugin("Vault") == null) {
+	            return false;
+	        }
+	        RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
+	        if (rsp == null) {
+	            return false;
+	        }
+	        econ = rsp.getProvider();
+	        return econ != null;
+	    }
 }
