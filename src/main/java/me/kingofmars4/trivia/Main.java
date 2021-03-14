@@ -25,6 +25,7 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	private static Economy econ = null;
 	
 	ArrayList<Question> questions = new ArrayList<Question>();
+	int currentQuestion = 0;
 	
 	@Override
 	public void onEnable() {
@@ -88,7 +89,12 @@ public class Main extends JavaPlugin implements Listener, CommandExecutor{
 	}
 	
     public void sendQuestion() {
-        this.question = questions.get(random(0, questions.size()-1));
+        questions.get(currentQuestion);
+        if (currentQuestion+1 > questions.size()-1) {
+        	currentQuestion = 0;
+        } else {
+        	currentQuestion++;
+        }
         
         Bukkit.broadcastMessage(pluginPrefix+color("&5A new &fTRIVIA &5is now starting, answer the following question in order to win &e%n points&f!".replace("%n", question.getReward()+"")));
         Bukkit.broadcastMessage(color("&e&lQuestion: &5&n"+question.getQuestion()));
